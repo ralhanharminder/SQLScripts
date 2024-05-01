@@ -1,1 +1,19 @@
+--Check current config for SQL databases
+SELECT
+db.name,
+db.is_encrypted,
+dm.encryption_state,
+--dm.encryption_state_desc,
+dm.percent_complete,
+dm.key_algorithm,
+dm.key_length,
+dm.encryptor_thumbprint
+FROM
+sys.databases db
+LEFT OUTER JOIN sys.dm_database_encryption_keys dm
+ON db.database_id = dm.database_id
+  
+-DMV's to check cert and keys  
+select * from sys.asymmetric_keys
+select * from sys.certificates
 
