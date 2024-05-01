@@ -1,0 +1,49 @@
+Part 1:  Making server ready
+to connect with Azure Key Vault
+Installing SQL connector
+Registry entries for SQL Cryptographic provider
+Creating a Cryptographic provider in SQL server
+
+Part 2: 
+Creating Credentials and Login pair (axis AD bang account) so the Crypto Provider can connect using those credentials
+
+Part 3: 
+Use the Part 2 credentials and crypto provider to fetch the required Key from Azure Key Vault to SQL Server   sys.asymmetrickeys  table   and this will also add a key entry in the registry settings
+
+Part 4: 
+Create a Login from the Key, 
+create new credentials similar to step 2 and map /add to Key Login.
+
+
+USE master
+GO
+   
+CREATE CREDENTIAL sysadm_ekm_cred_prd_344PV 
+WITH IDENTITY = 'keyvault_name', 
+SECRET = ''
+FOR CRYPTOGRAPHIC PROVIDER 'CryptographicProvider_name'
+  
+CREATE LOGIN [login_name] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]
+GO
+ALTER SERVER ROLE [sysadmin] ADD MEMBER [login_name]
+GO
+ 
+ALTER LOGIN [login_name] ADD CREDENTIAL sysadm_ekm_cred_prd_344PV;
+ 
+
+CREATE ASYMMETRIC KEY TDE_Key_prd_344PV
+FROM PROVIDER [AKV_EKM_Prov_Prd] 
+WITH PROVIDER_KEY_NAME = 'SQLKey344PV', 
+CREATION_DISPOSITION = OPEN_EXISTING;
+ 
+CREATE LOGIN TDE_Login_Prd_344PV FROM ASYMMETRIC KEY TDE_Key_prd_344PV; 
+GO
+ 
+CREATE CREDENTIAL Azure_EKM_TDE_cred_prd_344PV 
+WITH IDENTITY = 'keyvault_name', 
+SECRET = ''
+FOR CRYPTOGRAPHIC PROVIDER AKV_EKM_Prov_Prd
+ 
+ALTER LOGIN TDE_Login_Prd_344PV ADD CREDENTIAL Azure_EKM_TDE_cred_prd_344PV;
+
+
