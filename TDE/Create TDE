@@ -1,0 +1,130 @@
+
+Step 1 on SQL Server Enable below option:
+
+USE master;
+GO
+sp_configure 'show advanced options', 1 ;
+GO
+RECONFIGURE ;
+GO
+-- Enable EKM provider
+sp_configure 'EKM provider enabled', 1 ;
+GO
+RECONFIGURE ;
+GO
+
+Step 2
+
+Create a cryptographic provide for the server
+
+CREATE CRYPTOGRAPHIC PROVIDER My_Crypto_Provider
+FROM FILE = 'C:\Program Files\SQL Server Connector for Microsoft Azure Key Vault\Microsoft.AzureKeyVaultService.EKM.dll';
+GO
+
+
+Step 3: Run on powershell to add entry into registry, upon creation of asymmetric key or when we fetch it to sql server , the key will show in this registry location.
+
+ 
+New-Item -Path "HKLM:\SOFTWARE\Microsoft\SQL Server Cryptographic Provider"
+ 
+$acl = Get-Acl "HKLM:\SOFTWARE\Microsoft\SQL Server Cryptographic Provider"
+ 
+$acl.Access
+ 
+$idRef = [System.Security.Principal.NTAccount]("NT SERVICE\MSSQLSERVER")
+ 
+$regRights = [System.Security.AccessControl.RegistryRights]::FullControl
+ 
+$inhFlags = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit
+$prFlags = [System.Security.AccessControl.PropagationFlags]::None
+$acType = [System.Security.AccessControl.AccessControlType]::Allow
+ 
+$rule = New-Object System.Security.AccessControl.RegistryAccessRule ($idRef, $regRights, $inhFlags, $prFlags, $acType)
+ 
+$acl.AddAccessRule($rule)
+ 
+$acl.SetAccessRule($rule)
+ 
+$acl | Set-Acl -Path "HKLM:\SOFTWARE\Microsoft\SQL Server Cryptographic Provider"
+ 
+
+Step 4: Create credential for CryptoProvider to login into Azure using the Identity (i.e. Azure Key vault) and Secret to be copied from PMP
+
+CREATE CREDENTIAL Crypto_Credential
+WITH IDENTITY = 'keyvault_name',
+SECRET = ''
+FOR CRYPTOGRAPHIC PROVIDER My_Crypto_Provider;
+
+Step 5: Create login for your id if not exist
+
+CREATE LOGIN [login_name] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]
+GO
+ALTER SERVER ROLE [sysadmin] ADD MEMBER [login_name]
+GO
+
+Step 6: Link your login id to your Crypto Credential, so that proper azure access can be granted to credential
+
+ALTER LOGIN [login_name] ADD CREDENTIAL Crypto_Credential;
+GO
+
+
+Step 7:  Create a Asymmetric key from My_Crypto_Provider and Provider_Key_Name i.e.  This is the key which is actual Key in Azure Key vault
+
+CREATE ASYMMETRIC KEY $TDE_KEY_NAME
+FROM PROVIDER My_Crypto_Provider WITH
+PROVIDER_KEY_NAME = 'KEY_NAME_IN_AZURE',  --- For Example 'Keyname from azure'
+CREATION_DISPOSITION = OPEN_EXISTING 
+
+Step 8: Create a login from Asymmetric Key 
+
+CREATE LOGIN TDE_Login FROM ASYMMETRIC KEY $TDE_KEY_NAME ;
+GO
+
+Step 9: Create credential for crypto provider, which will be used by asymmetric key login.
+
+CREATE CREDENTIAL TDE_KEY_Credential
+WITH IDENTITY = 'keyvault_here',
+SECRET = ''
+FOR CRYPTOGRAPHIC PROVIDER My_Crypto_Provider
+
+ALTER LOGIN TDE_Login ADD CREDENTIAL TDE_KEY_Credential ; 
+GO
+
+
+Run on both nodes through PowerShell 
+ 
+Add-ClusterCheckpoint -RegistryCheckpoint "SOFTWARE\Microsoft\SQL Server Cryptographic Provider" -Resourcename "SQL Server"
+ 
+­­­­­­­­­­­­­­­Run the below queries on SQL Server: 
+ 
+USE <DB> --(any database)
+GO
+CREATE DATABASE ENCRYPTION KEY
+WITH ALGORITHM = AES_256
+ENCRYPTION BY SERVER ASYMMETRIC KEY  $TDE_KEY_NAME; --- asymmetric or certificate?
+GO
+ 
+ 
+ALTER DATABASE <DB>
+SET ENCRYPTION ON;
+GO
+ 
+Points to be Noted:
+ 
+1. Turning on the encryption on large databases may take time so we need to ensure we have downtime and alignment from the application team
+2. If the certificates are not created on both nodes of cluster, then after the failover DBs will go into restoring state. So, it is mandatory to create certificates on both nodes of cluster.
+3. Daily database refresh jobs will get effected if the same TDE key and certificates are not present in the other server where refresh is being performed.
+
+
+
+Certificates
+
+
+SELECT GETDATE() TodayDateTime
+GO
+SELECT 
+name, pvt_key_encryption_type_desc
+, issuer_name, subject, expiry_date
+FROM sys.certificates
+WHERE name = 'TDE_Cert'
+GO
