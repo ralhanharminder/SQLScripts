@@ -1,0 +1,3 @@
+dbname,datapath,datafile1,datapath2,datafile2,logpath,logfile,restoreas,flag,size
+Maps_AssessTestRestore1,J:\MSSQL\Data,Maps_AssessTestRestore125test.mdf,J:\MSSQL\Data1,Maps_AssessTestRestore125test.ndf,L:\MSSQL\Log,Maps_AssessTestRestore125test_log.ldf,Multifile3,N,L
+Maps_AssessTestRestore1,J:\MSSQL\Data,Maps_AssessTestRestore115test.mdf,J:\MSSQL\Data1,Maps_AssessTestRestore115test.ndf,L:\MSSQL\Log,Maps_AssessTestRestore115test_log.ldf,Multifile2,N,L
