@@ -16,3 +16,15 @@ CROSS APPLY sys.dm_os_volume_stats(database_id, file_id)
 DBCC SQLPERF(logspace)
 
 --sp_helpdb database_name_here
+
+
+--Each Database Sizes
+
+SELECT @@servername,d.NAME
+    ,ROUND(SUM(CAST(mf.size AS bigint)) * 8 / 1024, 0) Size_MBs
+    ,(SUM(CAST(mf.size AS bigint)) * 8 / 1024) / 1024 AS Size_GBs
+	,d.is_encrypted
+FROM sys.master_files mf
+INNER JOIN sys.databases d ON d.database_id = mf.database_id
+GROUP BY d.NAME,d.is_encrypted
+ORDER BY d.NAME
