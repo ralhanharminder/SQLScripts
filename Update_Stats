@@ -1,0 +1,11 @@
+DECLARE @sql nvarchar(MAX);
+SELECT @sql = (SELECT 'UPDATE STATISTICS ' +
+                      quotename(s.name) + '.' + quotename(o.name) +
+                      ' WITH FULLSCAN; ' + char(13) + char(10) AS [text()]
+               FROM   sys.objects o
+               JOIN   sys.schemas s ON o.schema_id = s.schema_id
+               WHERE  o.type = 'U'
+               FOR XML PATH(''), TYPE).value('.', 'nvarchar(MAX)');
+PRINT @sql
+
+
