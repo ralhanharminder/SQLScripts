@@ -1,0 +1,145 @@
+===============Production DB===============
+JAVA :  smi-app-prd.19328b747b46.database.windows.net
+Salesforce = PRD9SFDWRDBD01
+FMS = VPRDFMS92DBD01
+
+MRG-================
+
+Java MRG:    smi-app-mrg01.17cbd2d6b613.database.windows.net
+
+smi-app-devtst.430b30e38bda.database.windows.net
+Salesforce: MRG9DWRDBD02 
+FMS: VMRGFMS92DBD01
+
+
+
+
+
+Friday:  
+1 hour
+30 min 
+
+Thursday 2 hour
+
+Saturady 22 - 2.5 hours
+
+Monday : 30min in Morning
+1 hour training
+
+Tuesday
+1.5 hrs
+
+
+
+FMS Refresh  TST3 and DEV3
+
+
+======Check Restore status
+
+SELECT 
+   session_id as SPID, command, a.text AS Query, start_time, percent_complete,
+   dateadd(second,estimated_completion_time/1000, getdate()) as estimated_completion_time
+FROM sys.dm_exec_requests r 
+   CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) a 
+WHERE r.command in ('BACKUP DATABASE','RESTORE DATABASE') 
+
+
+--Backup Path
+
+SELECT physical_device_name 
+FROM msdb.dbo.backupmediafamily
+WHERE media_set_id = (
+    SELECT TOP 1 media_set_id 
+    FROM msdb.dbo.backupset 
+    ORDER BY backup_finish_date DESC
+)
+
+
+
+
+DEV3 backup 
+
+U:\MSSQL\Backup\DEV9FMSDBD01\FIDEV3\FULL\FIDEV3_Full_B4Refresh_22062024.bak
+
+
+TST3 Backup
+
+U:\MSSQL\Backup\TST9FMSDBD01\FITST3_Full_B4Refresh_24062024.bak
+
+
+
+
+===============================Take table backup
+
+DECLARE @Suffix NVARCHAR(100) = '_B4TSTREFRESH'; -- Define your suffix here
+
+DECLARE @SQL NVARCHAR(MAX) = '';
+DECLARE @TableName NVARCHAR(MAX);
+-- Create a cursor to loop through all tables in the database
+DECLARE table_cursor CURSOR FOR
+SELECT TABLE_NAME AS TableName
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE' and TABLE_NAME not like '%B4TSTREFRESH%';
+
+OPEN table_cursor;
+
+FETCH NEXT FROM table_cursor INTO @TableName;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    -- Generate the ALTER TABLE statement to rename the table
+    SET @SQL = @SQL + 'EXEC sp_rename ''' + @TableName + ''', ''' 
+                 + REPLACE(@TableName, '.', '.') + @Suffix + '''; ' + CHAR(13);
+
+    FETCH NEXT FROM table_cursor INTO @TableName;
+END
+
+CLOSE table_cursor;
+DEALLOCATE table_cursor;
+
+-- Print the generated SQL (optional, for verification)
+PRINT @SQL;
+
+-- Execute the generated SQL to rename the tables
+--EXEC sp_executesql @SQL;
+
+
+
+Java Databas MQ_  TARION_ENV_CONFIG
+
+BPS_DEV3;
+CEPATS_DEV3;
+DBD_DEV3;
+DTA_DEV3;
+ESIGN_DEV3;
+FDB_DEV3;
+TIP_DEV3;
+VBA_DEV3;
+VBS_DEV3;
+
+
+adding tst3 to 
+Backup
+USE master
+GO
+
+BACKUP DATABASE [FITST3] TO DISK = 'U:\FITST3.bak' WITH COMPRESSION
+GO
+
+BACKUP LOG [FITST3] TO DISK = 'U:\FITST3.trn' WITH COMPRESSION
+GO
+
+also add db to AG
+
+Restore
+
+USE [master]
+RESTORE DATABASE [FITST3] FROM  DISK = N'U:\MSSQL\Backup\FITST3.bak' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 5
+RESTORE LOG [FITST3] FROM  DISK = N'U:\MSSQL\Backup\FITST3.trn' WITH  FILE = 1,  NORECOVERY,  NOUNLOAD,  STATS = 5
+
+GO
+
+Turn AG ON.
+
+
+
