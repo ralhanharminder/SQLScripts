@@ -1,0 +1,4 @@
+sqlcmd -S TST9FMSDBD02 -d master -E -Q "RESTORE DATABASE [dummy] FROM  DISK = N'U:\forAG\dummy.bak' WITH  FILE = 1,  NORECOVERY"
+sqlcmd -S TST9FMSDBD02 -d master -E -Q "RESTORE LOG [dummy] FROM  DISK = N'U:\forAG\dummy.trn' WITH  FILE = 1,  NORECOVERY"
+
+sqlcmd -S TST9FMSDBD02 -d master -E -Q "ALTER DATABASE [dummy] SET HADR AVAILABILITY GROUP = [TST9FMS_AG1]"
