@@ -1,11 +1,11 @@
 # Parameters
-$sourceResourceGroup = "source-resource-group"  # Source Resource Group
-$sourceManagedInstance = "source-instance-name"   # Source Managed Instance Name
-$sourceDatabaseName = "source-database-name"      # Source Database Name
-$targetResourceGroup = "target-resource-group"    # Target Resource Group
-$targetManagedInstance = "target-instance-name"    # Target Managed Instance Name
-$targetDatabaseName = "target-database-name"      # Target Database Name
-$restoreDateTime = "YYYY-MM-DDTHH:MM:SS"           # Specify the backup time in UTC (e.g., "2023-10-01T14:30:00")
+$sourceResourceGroup = "rg-smi-app-prod"  # Source Resource Group
+$sourceManagedInstance = "smi-app-prd.19328b747b46.database.windows.net"   # Source Managed Instance Name
+$sourceDatabaseName = "BPS_PRD"      # Source Database Name
+$targetResourceGroup = "rg-smi-app-test01"    # Target Resource Group
+$targetManagedInstance = "smi-app-tstdev01.430b30e38bda.database.windows.net"    # Target Managed Instance Name
+$targetDatabaseName = "BPS_TST6"      # Target Database Name
+$restoreDateTime = "2024-09-24T04:00:00"           # Specify the backup time in UTC (e.g., "2023-10-01T14:30:00")
 
 # Log in to Azure account if not already logged in
 if (-not (Get-AzContext)) {
