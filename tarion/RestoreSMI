@@ -1,0 +1,45 @@
+# Parameters
+$sourceResourceGroup = "source-resource-group"  # Source Resource Group
+$sourceManagedInstance = "source-instance-name"   # Source Managed Instance Name
+$sourceDatabaseName = "source-database-name"      # Source Database Name
+$targetResourceGroup = "target-resource-group"    # Target Resource Group
+$targetManagedInstance = "target-instance-name"    # Target Managed Instance Name
+$targetDatabaseName = "target-database-name"      # Target Database Name
+$restoreDateTime = "YYYY-MM-DDTHH:MM:SS"           # Specify the backup time in UTC (e.g., "2023-10-01T14:30:00")
+
+# Log in to Azure account if not already logged in
+if (-not (Get-AzContext)) {
+    Connect-AzAccount -UseDeviceAuthentication
+}
+
+# Validate the restore date and time
+try {
+    $restorePointInTime = [datetime]::Parse($restoreDateTime)
+} catch {
+    Write-Host "Invalid date format. Please use the format: YYYY-MM-DDTHH:MM:SS"
+    exit
+}
+
+# Get the latest backup that is before the specified restore time
+$backupList = Get-AzSqlInstanceDatabaseBackup -ResourceGroupName $sourceResourceGroup -ManagedInstanceName $sourceManagedInstance -DatabaseName $sourceDatabaseName
+
+$backupToRestore = $backupList | Where-Object { $_.LastBackupTime -le $restorePointInTime } | Sort-Object LastBackupTime -Descending | Select-Object -First 1
+
+if (-not $backupToRestore) {
+    Write-Host "No backups found before the specified restore time."
+    exit
+}
+
+# Restore the database
+Start-AzSqlInstanceDatabaseRestore
+    -ResourceGroupName $targetResourceGroup
+    -ManagedInstanceName $targetManagedInstance
+    -DatabaseName $targetDatabaseName
+    -SourceResourceGroupName $sourceResourceGroup
+    -SourceManagedInstanceName $sourceManagedInstance
+    -SourceDatabaseName $sourceDatabaseName
+    -PointInTime $backupToRestore.LastBackupTime
+    -Replace
+
+# Output the status of the restoration
+Write-Host "Restoration of $sourceDatabaseName from $sourceManagedInstance to $targetDatabaseName on $targetManagedInstance at $($backupToRestore.LastBackupTime) has been initiated."
