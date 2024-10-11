@@ -1,0 +1,3 @@
+UPDATE TableNAME
+SET ColumnName = REPLACE(Servername, 'old_value', 'new_value')
+WHERE ColumnName LIKE '%old_value%';
