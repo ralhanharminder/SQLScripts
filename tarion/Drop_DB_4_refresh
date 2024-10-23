@@ -1,19 +1,2 @@
-
-
-# Variables
-$serverName = "smi-app-devtst.430b30e38bda.database.windows.net"
-$databaseName = "BPS_DEV2"
-
-# Connection string
-$connectionString = "Server=$serverName;Database=master;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
-# Drop database command
-$dropDatabaseQuery = "DROP DATABASE [$databaseName];"
-
-# Execute the command
-try {
-    Invoke-Sqlcmd -ConnectionString $connectionString -Query $dropDatabaseQuery
-    Write-Host "Database $databaseName dropped successfully."
-} catch {
-    Write-Host "Error dropping database: $_"
-}
-
+Connect-AzAccount
+Remove-AzSqlInstanceDatabase -Name "BPS_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01"
