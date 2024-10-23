@@ -1,2 +1,3 @@
 Connect-AzAccount
 Remove-AzSqlInstanceDatabase -Name "BPS_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01"
+New-AzResourceGroupDeployment -Name testone -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parameters.json
