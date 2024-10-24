@@ -1,3 +1,23 @@
 Connect-AzAccount
-Remove-AzSqlInstanceDatabase -Name "BPS_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01"
-New-AzResourceGroupDeployment -Name testone -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parameters.json
+Remove-AzSqlInstanceDatabase -Name "CEPATS_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "BPS_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "ESIGN_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "DBD_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "FDB_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "MQ_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "TIP_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+Remove-AzSqlInstanceDatabase -Name "VBS_DEV2" -InstanceName "smi-app-devtst" -ResourceGroupName "rg-smi-app-test01" -Force
+
+
+
+
+New-AzResourceGroupDeployment -Name RestoreCEPATSDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersCEPATS_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreBPSDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersBPS_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreESIGNDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersESIGN_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreDBDDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersDBD_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreFDBDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersFDB_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreMQDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersMQ_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreTIPDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersTIP_DEV2.json
+New-AzResourceGroupDeployment -Name RestoreVBSDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersVBS_DEV2.json
+
+
