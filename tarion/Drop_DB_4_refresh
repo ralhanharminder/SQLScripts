@@ -20,4 +20,4 @@ New-AzResourceGroupDeployment -Name RestoreMQDEV2 -ResourceGroupName rg-smi-app-
 New-AzResourceGroupDeployment -Name RestoreTIPDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersTIP_DEV2.json
 New-AzResourceGroupDeployment -Name RestoreVBSDEV2 -ResourceGroupName rg-smi-app-test01 -TemplateFile .\template.json -TemplateParameterFile .\parametersVBS_DEV2.json
 
-
+Java_Database_Refresh_DEV2_MAPSECURITY
