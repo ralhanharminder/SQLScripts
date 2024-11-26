@@ -29,15 +29,15 @@ Import-Module -Name SQLPS
 #Below variables are customizable. These should be validated and changed if needed
 ###################################################################################################
 #Next line sets installer as a SQL sysadmin, this should be a SQL DBA group
-$SQLAdminGroup="AXISSPECIALTY\Servers - SQL Server - Administrators" 
+$SQLAdminGroup="DOMAIN\Servers - SQL Server - Administrators" 
 
 #Credientials
  #Agent Account
-  $AGTSVCACCOUNT="AXISSPECIALTY\service-ussql-dev"
+  $AGTSVCACCOUNT="DOMAIN\service-ussql-dev"
   $AGTSVCSTARTUPTYPE="Automatic"
   $AGTSVCPASSWORD=$('strongpassword')
  #SQL Service Account
-  $SQLSVCACCOUNT="AXISSPECIALTY\service-ussql-dev"
+  $SQLSVCACCOUNT="DOMAIN\service-ussql-dev"
   $SQLSVCSTARTUPTYPE="Automatic"
   $SQLSVCPASSWORD=$('strongpassword')
  #Other Service Accounts
@@ -117,7 +117,7 @@ $accountName = 'AxisDBA'#dbMailDefaultAcct'
 $accountDescription = 'Mail account used for Database Mail'#Default dbMail Account'
 $originatingAddress = 'AxisDBA@axiccapital.com'#"$sqlServer@yourDomain.com"
 $replyToAddress = ''#'DO_NOT_REPLY@yourDomain.com'
-$smtpServer = 'smtp.axisspecialty.net'#'smtpServer.yourDomain.com'
+$smtpServer = 'smtp.DOMAIN.net'#'smtpServer.yourDomain.com'
 $profileName = 'DBMailProfile'#'dbMailDefaultProfile'
 $profileDescription = 'Profile used for database mail'#'Default dbMail profile'
 
@@ -379,13 +379,13 @@ Write-Host "Executed AddNewOperators.sql. Output sent to $folderpath\AddNewOpera
 $Date = Get-Date
 $SetCMDBAccess = @"
 USE [master]; 
-EXEC('CREATE LOGIN [AXISSPECIALTY\$CMDBLogInCrediential] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]');
-CREATE USER [AXISSPECIALTY\$CMDBLogInCrediential];
-EXEC sp_addrolemember N'db_datareader', N'AXISSPECIALTY\$CMDBLogInCrediential'
+EXEC('CREATE LOGIN [DOMAIN\$CMDBLogInCrediential] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]');
+CREATE USER [DOMAIN\$CMDBLogInCrediential];
+EXEC sp_addrolemember N'db_datareader', N'DOMAIN\$CMDBLogInCrediential'
 
 USE [msdb];
-CREATE USER [AXISSPECIALTY\$CMDBLogInCrediential]
-EXEC sp_addrolemember N'db_datareader', N'AXISSPECIALTY\$CMDBLogInCrediential'
+CREATE USER [DOMAIN\$CMDBLogInCrediential]
+EXEC sp_addrolemember N'db_datareader', N'DOMAIN\$CMDBLogInCrediential'
 "@
 
 Invoke-Sqlcmd $SetCMDBAccess
