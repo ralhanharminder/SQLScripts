@@ -1,0 +1,19 @@
+Set-ExecutionPolicy -Scope CurrentUser ByPass
+$ServiceAccs = Import-csv "\\bos-cifs-lif-nrpl-n18\SQLDB_Decommissions_1$\Harminder\Scripts\Servers\ruvalidation.csv"
+$Date = Get-Date -Format FiledateTime
+
+$filedir = '\\bos-cifs-lif-nrpl-n18\SQLDB_Decommissions_1$\Harminder\Scripts\RunAScript\RUNASCRIPT\OUTPUT\Query_out_mail' + $Date +'.csv'
+$filedir
+$i = 0
+$ServiceAccs | ForEach-Object {
+#$filedir = $ServiceAccs[$i].Server + $Date +'.csv'
+#$filedir
+#Get-DbaDatabase -SqlInstance $ServiceAccs[$i].Servername | Invoke-DbaQuery -File "\\bos-cifs-lif-nrpl-n18\SQLDB_Decommissions_1$\Harminder\Scripts\RunAScript\RUNASCRIPT\dbcount.sql" | Export-Csv -Path $filedir -NoTypeInformation -Append
+#Invoke-DbaQuery -SqlInstance $ServiceAccs[$i].Servername -Database master -File "\\bos-cifs-lif-nrpl-n18\SQLDB_Decommissions_1$\Harminder\Scripts\RunAScript\RUNASCRIPT\serviceaccount.sql" | Export-Csv -Path $filedir -NoTypeInformation -Append
+Get-DbaService -ComputerName $ServiceAccs[$i].Servername  | Export-Csv -Path $filedir -NoTypeInformation -Append -force
+
+
+$i= $i + 1
+
+
+}
