@@ -1,0 +1,29 @@
+CREATE TABLE SampleTable (
+    ID INT PRIMARY KEY,
+    Name NVARCHAR(100),
+    Age INT,
+    City NVARCHAR(100)
+);
+
+
+ID,Name,Age,City
+1,John Doe,29,New York
+2,Jane Smith,34,Los Angeles
+3,Emily Davis,27,Chicago
+4,Michael Brown,42,Houston
+
+
+BULK INSERT SampleTable
+FROM 'C:\Path\To\Your\sample_data.csv'
+WITH (
+    FIRSTROW = 2, -- Skip the header row
+    FIELDTERMINATOR = ',', -- Use comma as the field delimiter
+    ROWTERMINATOR = '\n', -- Use newline as the row terminator
+    TABLOCK
+);
+
+
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+EXEC sp_configure 'Ad Hoc Distributed Queries', 1;
+RECONFIGURE;
