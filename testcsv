@@ -1,4 +1,4 @@
-CREATE TABLE SampleTable (
+CREATE TABLE DBA.dbo.SampleTable (
     ID INT PRIMARY KEY,
     Name NVARCHAR(100),
     Age INT,
@@ -13,8 +13,8 @@ ID,Name,Age,City
 4,Michael Brown,42,Houston
 
 
-BULK INSERT SampleTable
-FROM 'C:\Path\To\Your\sample_data.csv'
+BULK INSERT DBA.dbo.SampleTable
+FROM 'T:\Sample.csv'
 WITH (
     FIRSTROW = 2, -- Skip the header row
     FIELDTERMINATOR = ',', -- Use comma as the field delimiter
