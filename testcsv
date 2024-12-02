@@ -30,7 +30,8 @@ RECONFIGURE;
 
 
 SELECT 
-    'SQL Server ' + 
-    CAST(SERVERPROPERTY('ProductMajorVersion') AS VARCHAR(10)) + '.' + 
-    CAST(SERVERPROPERTY('ProductMinorVersion') AS VARCHAR(10)) + ' ' +
-    SERVERPROPERTY('Edition') AS SQLVersionAndEdition
+'SQL Server ' + 
+CAST(SERVERPROPERTY('ProductMajorVersion') AS VARCHAR(10)) + '.' + 
+CAST(SERVERPROPERTY('ProductMinorVersion') AS VARCHAR(10)) + ' ' +
+CAST(SERVERPROPERTY('Edition') AS VARCHAR(50)) AS SQLVersionAndEdition
+
