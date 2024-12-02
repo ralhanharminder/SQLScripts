@@ -31,7 +31,16 @@ RECONFIGURE;
 
 SELECT 
 'SQL Server ' + 
-CAST(SERVERPROPERTY('ProductMajorVersion') AS VARCHAR(10)) + '.' + 
-CAST(SERVERPROPERTY('ProductMinorVersion') AS VARCHAR(10)) + ' ' +
+CASE 
+WHEN SERVERPROPERTY('ProductMajorVersion') = '15' THEN '2019'
+WHEN SERVERPROPERTY('ProductMajorVersion') = '14' THEN '2017'
+WHEN SERVERPROPERTY('ProductMajorVersion') = '13' THEN '2016'
+WHEN SERVERPROPERTY('ProductMajorVersion') = '12' THEN '2014'
+WHEN SERVERPROPERTY('ProductMajorVersion') = '11' THEN '2012'
+WHEN SERVERPROPERTY('ProductMajorVersion') = '10' THEN '2008'
+WHEN SERVERPROPERTY('ProductMajorVersion') = '9' THEN '2005'
+ELSE 'Unknown Version'
+END + ' ' +
 CAST(SERVERPROPERTY('Edition') AS VARCHAR(50)) AS SQLVersionAndEdition
+
 
