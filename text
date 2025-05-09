@@ -1,9 +1,171 @@
--- Update statistics with FULLSCAN for all involved tables
-UPDATE STATISTICS dbo.PS_PO_REQLOAD_RQST WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_PO_LINE_DISTRIB WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_PO_LINE WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_VOUCHER_LINE WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_VOUCHER WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_PYMNT_VCHR_XREF WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_VCHR_ACCTG_LINE WITH FULLSCAN;
-UPDATE STATISTICS dbo.PS_PAYMENT_TBL WITH FULLSCAN;
+USE [msdb]
+GO
+
+/****** Object:  Job [Blocking Check]    Script Date: 2025-05-09 4:17:42 PM ******/
+BEGIN TRANSACTION
+DECLARE @ReturnCode INT
+SELECT @ReturnCode = 0
+/****** Object:  JobCategory [[IDP_JOBS]]    Script Date: 2025-05-09 4:17:43 PM ******/
+IF NOT EXISTS (SELECT name FROM msdb.dbo.syscategories WHERE name=N'[IDP_JOBS]' AND category_class=1)
+BEGIN
+EXEC @ReturnCode = msdb.dbo.sp_add_category @class=N'JOB', @type=N'LOCAL', @name=N'[IDP_JOBS]'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+END
+
+DECLARE @jobId BINARY(16)
+EXEC @ReturnCode =  msdb.dbo.sp_add_job @job_name=N'Blocking Check', 
+		@enabled=1, 
+		@notify_level_eventlog=0, 
+		@notify_level_email=0, 
+		@notify_level_netsend=0, 
+		@notify_level_page=0, 
+		@delete_level=0, 
+		@description=N'No description available.', 
+		@category_name=N'[IDP_JOBS]', 
+		@owner_login_name=N'bob', @job_id = @jobId OUTPUT
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+/****** Object:  Step [Blocks]    Script Date: 2025-05-09 4:17:43 PM ******/
+EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Blocks', 
+		@step_id=1, 
+		@cmdexec_success_code=0, 
+		@on_success_action=1, 
+		@on_success_step_id=0, 
+		@on_fail_action=2, 
+		@on_fail_step_id=0, 
+		@retry_attempts=0, 
+		@retry_interval=0, 
+		@os_run_priority=0, @subsystem=N'TSQL', 
+		@command=N'IF OBJECT_ID(N''tempdb..#TEMP'') IS NOT NULL
+BEGIN
+DROP TABLE #TEMP
+END
+GO
+
+
+SELECT Distinct s.session_id
+                   , r.STATUS
+                    ,r.blocking_session_id
+                    , r.wait_time 
+                    , Substring(st.TEXT, (r.statement_start_offset / 2) + 1, (
+                            (
+                                CASE r.statement_end_offset
+                                    WHEN - 1
+                                        THEN Datalength(st.TEXT)
+                                    ELSE r.statement_end_offset
+                                    END - r.statement_start_offset
+                                ) / 2
+                            ) + 1) statement_text
+                    , Coalesce(Quotename(Db_name(st.dbid)) + N''.'' + Quotename(Object_schema_name(st.objectid, st.dbid)) +
+                        N''.'' + Quotename(Object_name(st.objectid, st.dbid)), '''') AS  command_text
+                   
+                    ,r.command
+                    
+                    ,s.login_name
+                    
+                    ,s.host_name
+                    
+                    ,s.login_time
+
+INTO #TEMP
+FROM sys.dm_exec_sessions AS s
+INNER JOIN sys.dm_exec_requests AS r ON r.session_id = s.session_id
+LEFT join sys.dm_os_waiting_tasks w on r.session_id= w.session_id 
+CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS st
+WHERE r.session_id != @@SPID
+
+
+IF (
+        SELECT count(*)
+        FROM #TEMP
+        WHERE blocking_session_id > 50 AND wait_time>300000
+        ) <> 0
+BEGIN
+    -- blocking found, sent email. 
+    DECLARE @tableHTML NVARCHAR(MAX);
+
+    SET @tableHTML = N''<H1>Blocking Report</H1>'' + N''<table border="1">''+ N''<th>session_id</th>'' + N''<th>Status</th>'' + 
+                     N''<th>blocking_session_id</th>''+ 
+                     N''<th>WaitMinutes</th>''+ 
+                                     N''<th>statement_text</th>'' + N''<th>command_text</th>'' + 
+                     N''<th>command</th>'' + N''<th>login_name</th>'' + N''<th>host_name</th>'' 
+                                     + N''<th>login_time</th>'' + ''</tr>'' + CAST((
+
+
+
+
+	 SELECT 
+	 td = session_id
+                    ,''''
+					 ,td = STATUS
+                    ,''''
+					 ,td = blocking_session_id
+                    ,''''
+					 ,td = ((wait_time/1000)/60) 
+                    ,''''
+					 ,td = statement_text
+                    ,''''
+					 ,td = command_text
+                    ,''''
+                
+                    ,td = command
+                    ,''''
+                    ,td = login_name
+                    ,''''
+                    ,td = host_name
+                    ,''''
+                    ,td = login_time
+
+FROM #TEMP  	
+WHERE  	
+(session_id IN ( SELECT blocking_session_id FROM #TEMP WHERE  blocking_session_id > 50 and wait_time>300000)
+OR session_id IN ( SELECT session_id FROM #TEMP WHERE  blocking_session_id > 50 and wait_time>300000))
+ORDER BY session_id
+   FOR XML PATH(''tr'')
+                    ,TYPE
+ ) AS NVARCHAR(MAX)) + N''</table>'';
+				
+				PRINT @tableHTML
+
+DECLARE @Sbj varchar(255)
+select @Sbj =''Blocking queries Alert on ''+@@SERVERNAME
+
+    EXEC msdb.dbo.sp_send_dbmail @body = @tableHTML
+        ,@body_format = ''HTML''
+        ,@profile_name = N''DBMailProfile''
+        ,@recipients = ''DL-Accenture-BI-Support@axiscapital.com;axisdba@axiscapital.com;allen.won@axiscapital.com;sylvie.smith-ford@axiscapital.com;Zubair.Khan@axiscapital.com''
+		,@subject = @Sbj;
+
+			  
+END
+
+', 
+		@database_name=N'master', 
+		@flags=0
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_update_job @job_id = @jobId, @start_step_id = 1
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule @job_id=@jobId, @name=N'Daily', 
+		@enabled=1, 
+		@freq_type=4, 
+		@freq_interval=1, 
+		@freq_subday_type=4, 
+		@freq_subday_interval=10, 
+		@freq_relative_interval=0, 
+		@freq_recurrence_factor=0, 
+		@active_start_date=20210401, 
+		@active_end_date=99991231, 
+		@active_start_time=0, 
+		@active_end_time=235959, 
+		@schedule_uid=N'f1751fa4-313a-4fe0-ae76-8da14ecae88a'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_add_jobserver @job_id = @jobId, @server_name = N'(local)'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+COMMIT TRANSACTION
+GOTO EndSave
+QuitWithRollback:
+    IF (@@TRANCOUNT > 0) ROLLBACK TRANSACTION
+EndSave:
+GO
+
+
