@@ -1,58 +1,67 @@
 USE [DBA]
 GO
 
-IF OBJECT_ID('tempdb..#who') IS NOT NULL
-    DROP TABLE #who;
-
--- Create temporary table to capture active connections
-CREATE TABLE #who (
-    [QueryDuration] VARCHAR(256),
-    [Loginname] SYSNAME,
-    [Hostname] VARCHAR(200),
-    [Databasename] SYSNAME,
-    [Programname] VARCHAR(200),
-    [Sessionid] INT,
-    [Starttime] DATETIME,
-    [SQLText] XML NULL
-);
-
--- Capture active sessions into #who table
-EXEC [dbo].[sp_WhoIsActive] 
-    @show_sleeping_spids = 2, 
-    @output_column_list = '[dd%][login_name][host_name][database_name][Program_name][session_id][start_time][sql_text]', 
-    @destination_table = '#who';
-
--- Insert distinct new connections into audit table
-INSERT INTO dbo.whoisactive (
-    [Loginname], [Hostname], [Databasename], [Programname], [Starthour], 
-    [SQLText], [QueryDuration], InsertedDate, SPID
-)
-SELECT DISTINCT
-    w.[Loginname],
-    w.[Hostname],
-    w.[Databasename],
-    w.[Programname],
-    DATEADD(hour, DATEDIFF(hour, 0, w.Starttime), 0) AS Starthour, -- Breakdown by hour
-    CONVERT(NVARCHAR(MAX), w.[SQLText]) AS SQLText,
-    w.[QueryDuration],
-    GETDATE() AS InsertedDate,
-    w.Sessionid
-FROM #who w
-WHERE w.Sessionid > 50
-AND w.Starttime >= CAST(GETDATE() AS DATE);
-
--- Debugging Output (if @Debug is set)
-IF @Debug = 1 
+-- Create the table to store captured sessions
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SessionAudit')
 BEGIN
-    SELECT 
-        [Servername] = @@SERVERNAME,
-        [ID], [Loginname], [Hostname], [Databasename], 
-        [Programname], [Starthour], [SQLText], [QueryDuration], SPID
-    FROM dbo.whoisactive;
+    CREATE TABLE dbo.SessionAudit (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        Loginname SYSNAME,
+        Hostname VARCHAR(200),
+        Databasename SYSNAME,
+        Programname VARCHAR(200),
+        SessionID INT,
+        StartTime DATETIME,
+        SQLText XML NULL,
+        QueryDuration VARCHAR(256),
+        InsertedDate DATETIME DEFAULT GETDATE()
+    );
 END
 
--- Purge old records (older than 3 months)
-DELETE FROM dbo.whoisactive 
-WHERE DATEDIFF(MONTH, [Starthour], GETDATE()) > 3;
+GO
+
+-- Create the stored procedure to capture active sessions
+CREATE PROCEDURE dbo.CaptureActiveSessions
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Temporary table for storing session details
+    IF OBJECT_ID('tempdb..#SessionTemp') IS NOT NULL
+        DROP TABLE #SessionTemp;
+
+    CREATE TABLE #SessionTemp (
+        Loginname SYSNAME,
+        Hostname VARCHAR(200),
+        Databasename SYSNAME,
+        Programname VARCHAR(200),
+        SessionID INT,
+        StartTime DATETIME,
+        SQLText XML NULL,
+        QueryDuration VARCHAR(256)
+    );
+
+    -- Capture active sessions using sp_WhoIsActive
+    EXEC [dbo].[sp_WhoIsActive] 
+        @show_sleeping_spids = 2, 
+        @output_column_list = '[login_name][host_name][database_name][program_name][session_id][start_time][sql_text][dd%]', 
+        @destination_table = '#SessionTemp';
+
+    -- Insert the captured data into the permanent audit table
+    INSERT INTO dbo.SessionAudit (
+        Loginname, Hostname, Databasename, Programname, 
+        SessionID, StartTime, SQLText, QueryDuration
+    )
+    SELECT 
+        Loginname, Hostname, Databasename, Programname, 
+        SessionID, StartTime, SQLText, QueryDuration
+    FROM #SessionTemp;
+
+    -- Optional: Display the captured sessions
+    SELECT * FROM dbo.SessionAudit ORDER BY InsertedDate DESC;
+END
 
 GO
+
+-- To execute and capture sessions, simply run:
+EXEC dbo.CaptureActiveSessions;
