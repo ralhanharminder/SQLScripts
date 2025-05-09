@@ -1,7 +1,7 @@
 USE [DBA]
 GO
 
--- Create the table to store captured sessions
+-- Ensure the SessionAudit table exists and includes BlockingSessionID
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SessionAudit')
 BEGIN
     CREATE TABLE dbo.SessionAudit (
@@ -11,6 +11,7 @@ BEGIN
         Databasename SYSNAME,
         Programname VARCHAR(200),
         SessionID INT,
+        BlockingSessionID INT NULL, -- NEW: Column to track blocking sessions
         StartTime DATETIME,
         SQLText XML NULL,
         QueryDuration VARCHAR(256),
@@ -20,7 +21,7 @@ END
 
 GO
 
--- Create the stored procedure to capture active sessions
+-- Create the stored procedure to capture active sessions including blocking session details
 CREATE PROCEDURE dbo.CaptureActiveSessions
 AS
 BEGIN
@@ -36,32 +37,51 @@ BEGIN
         Databasename SYSNAME,
         Programname VARCHAR(200),
         SessionID INT,
+        BlockingSessionID INT NULL, -- NEW: Capture blocking session ID
         StartTime DATETIME,
         SQLText XML NULL,
         QueryDuration VARCHAR(256)
     );
 
-    -- Capture active sessions using sp_WhoIsActive
+    -- Capture active sessions with blocking details using sp_WhoIsActive
     EXEC [dbo].[sp_WhoIsActive] 
         @show_sleeping_spids = 2, 
-        @output_column_list = '[login_name][host_name][database_name][program_name][session_id][start_time][sql_text][dd%]', 
+        @output_column_list = '[login_name][host_name][database_name][program_name][session_id][blocking_session_id][start_time][sql_text][dd%]', 
         @destination_table = '#SessionTemp';
 
     -- Insert the captured data into the permanent audit table
     INSERT INTO dbo.SessionAudit (
         Loginname, Hostname, Databasename, Programname, 
-        SessionID, StartTime, SQLText, QueryDuration
+        SessionID, BlockingSessionID, StartTime, SQLText, QueryDuration
     )
     SELECT 
         Loginname, Hostname, Databasename, Programname, 
-        SessionID, StartTime, SQLText, QueryDuration
+        SessionID, BlockingSessionID, StartTime, SQLText, QueryDuration
     FROM #SessionTemp;
 
-    -- Optional: Display the captured sessions
+    -- Optional: Display the latest captured sessions
     SELECT * FROM dbo.SessionAudit ORDER BY InsertedDate DESC;
 END
 
 GO
 
--- To execute and capture sessions, simply run:
+-- Create a stored procedure to clean data older than 15 days
+CREATE PROCEDURE dbo.CleanupOldSessions
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Delete records older than 15 days
+    DELETE FROM dbo.SessionAudit
+    WHERE InsertedDate < DATEADD(DAY, -15, GETDATE());
+    
+    PRINT 'Old session records older than 15 days have been deleted.';
+END
+
+GO
+
+-- Execute the capture stored procedure
 EXEC dbo.CaptureActiveSessions;
+
+-- Execute cleanup to remove sessions older than 15 days
+EXEC dbo.CleanupOldSessions;
