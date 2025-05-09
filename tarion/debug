@@ -1,94 +1,58 @@
 USE [DBA]
 GO
 
-/****** Object:  StoredProcedure [dbo].[whoisactive_capture]    Script Date: 5/9/2025 4:24:01 PM ******/
-
-
 IF OBJECT_ID('tempdb..#who') IS NOT NULL
     DROP TABLE #who;
 
-CREATE table #who (
- [QueryDuration] varchar(256),
- [Loginname] sysname
-,[Hostname] VARCHAR(200)
-,[Databasename] sysname
-,[Programname] VARCHAR(200)
-,[Sessionid] INT 
-,[Starttime] DATETIME
-,[SQLText] [xml] NULL
+-- Create temporary table to capture active connections
+CREATE TABLE #who (
+    [QueryDuration] VARCHAR(256),
+    [Loginname] SYSNAME,
+    [Hostname] VARCHAR(200),
+    [Databasename] SYSNAME,
+    [Programname] VARCHAR(200),
+    [Sessionid] INT,
+    [Starttime] DATETIME,
+    [SQLText] XML NULL
 );
 
--- ====================================================
--- Capture to #who all those current connections 
--- ====================================================
+-- Capture active sessions into #who table
+EXEC [dbo].[sp_WhoIsActive] 
+    @show_sleeping_spids = 2, 
+    @output_column_list = '[dd%][login_name][host_name][database_name][Program_name][session_id][start_time][sql_text]', 
+    @destination_table = '#who';
 
-EXEC [dbo].[sp_WhoIsActive] @show_sleeping_spids = 2, @output_column_list = '[dd%][login_name][host_name][database_name][Program_name][session_id][start_time][sql_text]', @destination_table = '#who' ;
-
--- =================================================================
--- Write to the Audit Table .. 
---      Any DISTINCT "NEW" Connections by loginname, hostname, breakdown of conenctions by the hour
--- =================================================================
-
-INSERT INTO dbo.whoisactive 
-(   
-[Loginname]
-,[Hostname]
-,[Databasename]
-,[Programname]
-,[Starthour]
-,[SQLText]
-,[QueryDuration]
-,InsertedDate
-,SPID
+-- Insert distinct new connections into audit table
+INSERT INTO dbo.whoisactive (
+    [Loginname], [Hostname], [Databasename], [Programname], [Starthour], 
+    [SQLText], [QueryDuration], InsertedDate, SPID
 )
+SELECT DISTINCT
+    w.[Loginname],
+    w.[Hostname],
+    w.[Databasename],
+    w.[Programname],
+    DATEADD(hour, DATEDIFF(hour, 0, w.Starttime), 0) AS Starthour, -- Breakdown by hour
+    CONVERT(NVARCHAR(MAX), w.[SQLText]) AS SQLText,
+    w.[QueryDuration],
+    GETDATE() AS InsertedDate,
+    w.Sessionid
+FROM #who w
+WHERE w.Sessionid > 50
+AND w.Starttime >= CAST(GETDATE() AS DATE);
 
- 
-SELECT DISTINCT -- Today's Active User Connections (Spid>50) 
- [Loginname]
-,[Hostname]
-,[Databasename]
-,[Programname]
-,Starthour = DATEADD(hour, DATEDIFF(hour, 0, starttime), 0) -- Current Hour
-,convert([nvarchar](max),[SQLText]) [SQLText]
-,[QueryDuration]
-,Getdate()
-,Session_ID
-FROM #who 
-WHERE 1=1
-AND [Sessionid] > 50
-and [Starttime] >= CAST (GETDATE() AS DATE )
--- Exclude those which match what we've already captured
---EXCEPT 
---SELECT  
--- [Loginname] 
---,[Hostname]
---,[Databasename]
---,[Programname]
---,[Starthour]
---,[SQLText]
---FROM dbo.whoisactive 
---WHERE [Starthour] >= CAST (GETDATE() AS DATE )
---;
-
+-- Debugging Output (if @Debug is set)
 IF @Debug = 1 
-SELECT 
- [Servername] = @@SERVERNAME
-,[ID]
-,[Loginname]
-,[Hostname]
-,[Databasename]
-,[Programname]
-,[Starthour]
-,[SQLText]
-,[QueryDuration]
-,SPID
-FROM dbo.whoisactive 
+BEGIN
+    SELECT 
+        [Servername] = @@SERVERNAME,
+        [ID], [Loginname], [Hostname], [Databasename], 
+        [Programname], [Starthour], [SQLText], [QueryDuration], SPID
+    FROM dbo.whoisactive;
+END
 
---Purge 
-Delete FROM dbo.whoisactive 
-Where DateDiff(Month,[Starthour],getdate()) > 3
+-- Purge old records (older than 3 months)
+DELETE FROM dbo.whoisactive 
+WHERE DATEDIFF(MONTH, [Starthour], GETDATE()) > 3;
 
-END;
 GO
-
-
