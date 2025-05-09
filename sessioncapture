@@ -1,0 +1,226 @@
+Table
+
+
+
+USE [Axis_DBA]
+GO
+
+/****** Object:  Table [dbo].[whoisactive]    Script Date: 6/27/2023 4:40:58 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[whoisactive](
+	[ID] [int] IDENTITY(1,1) NOT NULL,
+	[Loginname] [sysname] NOT NULL,
+	[Hostname] [varchar](200) NULL,
+	[Databasename] [sysname] NULL,
+	[Programname] [varchar](200) NULL,
+	[Starthour] [datetime] NULL,
+	[SQLText] [nvarchar](max) NULL,
+	[QueryDuration] [varchar](256) NULL,
+	[SPID] [int] NULL,
+	[InsertedDate] [datetime] NULL,
+ CONSTRAINT [PK_whoisactive] PRIMARY KEY CLUSTERED 
+(
+	[ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+
+
+
+
+
+Stored procedure
+
+USE [Axis_DBA]
+GO
+
+/****** Object:  StoredProcedure [dbo].[whoisactive_capture]    Script Date: 6/27/2023 4:41:15 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+-- =============================================
+-- Author:      Olujide Olosunde
+-- Create date: June 2017
+-- Description: Capture Session Activity to a Table
+--
+--  Sample Usage
+--          EXEC msdb.dbo.whoisactive_capture @Debug = 1
+--          EXEC sp_whoisactive
+-- 13/04/2023 -- Added Session_ID, Inserted Date and QueryDuration
+-- =============================================
+CREATE PROCEDURE [dbo].[whoisactive_capture] 
+
+    @retention_days int = 0
+,   @Debug BIT = 0
+AS
+BEGIN
+SET NOCOUNT ON;
+
+IF OBJECT_ID('tempdb..#who') IS NOT NULL
+    DROP TABLE #who;
+
+CREATE table #who (
+ [QueryDuration] varchar(256),
+ [Loginname] sysname
+,[Hostname] VARCHAR(200)
+,[Databasename] sysname
+,[Programname] VARCHAR(200)
+,[Sessionid] INT 
+,[Starttime] DATETIME
+,[SQLText] [xml] NULL
+);
+
+-- ====================================================
+-- Capture to #who all those current connections 
+-- ====================================================
+
+EXEC sp_whoisactive @show_sleeping_spids = 2, @output_column_list = '[dd%][login_name][host_name][database_name][Program_name][session_id][start_time][sql_text]', @destination_table = '#who' ;
+
+-- =================================================================
+-- Write to the Audit Table .. 
+--      Any DISTINCT "NEW" Connections by loginname, hostname, breakdown of conenctions by the hour
+-- =================================================================
+
+INSERT INTO dbo.whoisactive 
+(   
+[Loginname]
+,[Hostname]
+,[Databasename]
+,[Programname]
+,[Starthour]
+,[SQLText]
+,[QueryDuration]
+,InsertedDate
+,SPID
+)
+
+ 
+SELECT DISTINCT -- Today's Active User Connections (Spid>50) 
+ [Loginname]
+,[Hostname]
+,[Databasename]
+,[Programname]
+,Starthour = DATEADD(hour, DATEDIFF(hour, 0, starttime), 0) -- Current Hour
+,convert([nvarchar](max),[SQLText]) [SQLText]
+,[QueryDuration]
+,Getdate()
+,SessionID
+FROM #who 
+WHERE 1=1
+AND [Sessionid] > 50
+and [Starttime] >= CAST (GETDATE() AS DATE )
+-- Exclude those which match what we've already captured
+--EXCEPT 
+--SELECT  
+-- [Loginname] 
+--,[Hostname]
+--,[Databasename]
+--,[Programname]
+--,[Starthour]
+--,[SQLText]
+--FROM dbo.whoisactive 
+--WHERE [Starthour] >= CAST (GETDATE() AS DATE )
+--;
+
+IF @Debug = 1 
+SELECT 
+ [Servername] = @@SERVERNAME
+,[ID]
+,[Loginname]
+,[Hostname]
+,[Databasename]
+,[Programname]
+,[Starthour]
+,[SQLText]
+,[QueryDuration]
+,SPID
+FROM dbo.whoisactive 
+
+--Purge 
+Delete FROM dbo.whoisactive 
+Where DateDiff(Month,[Starthour],getdate()) > 3
+
+END;
+GO
+
+
+
+Agent JOB
+
+USE [msdb]
+GO
+
+/****** Object:  Job [DBA - Capture whoisactive]    Script Date: 6/29/2023 4:01:36 PM ******/
+BEGIN TRANSACTION
+DECLARE @ReturnCode INT
+SELECT @ReturnCode = 0
+/****** Object:  JobCategory [[Uncategorized (Local)]]    Script Date: 6/29/2023 4:01:36 PM ******/
+IF NOT EXISTS (SELECT name FROM msdb.dbo.syscategories WHERE name=N'[Uncategorized (Local)]' AND category_class=1)
+BEGIN
+EXEC @ReturnCode = msdb.dbo.sp_add_category @class=N'JOB', @type=N'LOCAL', @name=N'[Uncategorized (Local)]'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+END
+
+DECLARE @jobId BINARY(16)
+EXEC @ReturnCode =  msdb.dbo.sp_add_job @job_name=N'DBA - Capture whoisactive', 
+		@enabled=1, 
+		@notify_level_eventlog=0, 
+		@notify_level_email=0, 
+		@notify_level_netsend=0, 
+		@notify_level_page=0, 
+		@delete_level=0, 
+		@description=N'No description available.', 
+		@category_name=N'[Uncategorized (Local)]', 
+		@owner_login_name=N'sa', @job_id = @jobId OUTPUT
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+/****** Object:  Step [Capture whoisactive]    Script Date: 6/29/2023 4:01:37 PM ******/
+EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Capture whoisactive', 
+		@step_id=1, 
+		@cmdexec_success_code=0, 
+		@on_success_action=1, 
+		@on_success_step_id=0, 
+		@on_fail_action=2, 
+		@on_fail_step_id=0, 
+		@retry_attempts=0, 
+		@retry_interval=0, 
+		@os_run_priority=0, @subsystem=N'TSQL', 
+		@command=N'EXEC Axis_DBA.dbo.whoisactive_capture', 
+		@database_name=N'Axis_DBA', 
+		@flags=0
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_update_job @job_id = @jobId, @start_step_id = 1
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule @job_id=@jobId, @name=N'Every 5mins', 
+		@enabled=1, 
+		@freq_type=4, 
+		@freq_interval=1, 
+		@freq_subday_type=4, 
+		@freq_subday_interval=5, 
+		@freq_relative_interval=0, 
+		@freq_recurrence_factor=0, 
+		@active_start_date=20170612, 
+		@active_end_date=99991231, 
+		@active_start_time=0, 
+		@active_end_time=235959, 
+		@schedule_uid=N'e08ba8ba-f9d5-46fb-879e-a031c8e42ec7'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_add_jobserver @job_id = @jobId, @server_name = N'(local)'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+COMMIT TRANSACTION
+GOTO EndSave
+QuitWithRollback:
+    IF (@@TRANCOUNT > 0) ROLLBACK TRANSACTION
+EndSave:
+GO
