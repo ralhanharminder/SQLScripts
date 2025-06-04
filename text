@@ -1,22 +1,3 @@
-CREATE PROCEDURE dbo.SendDeadlockAlert
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @body NVARCHAR(MAX);
-
-    -- Get the latest deadlock information using XML formatting (compatible with older versions)
-    SELECT @body = (
-        SELECT CONVERT(NVARCHAR(MAX), event_data) + CHAR(10)
-        FROM sys.fn_xe_file_target_read_file('C:\DeadlockLogs\Deadlocks*.xel', NULL, NULL, NULL)
-        FOR XML PATH('')
-    );
-
-    -- Send Email Notification
-    EXEC msdb.dbo.sp_send_dbmail
-        @profile_name = 'YourMailProfile',  -- Replace with your Database Mail profile name
-        @recipients = 'your.email@example.com', -- Replace with recipient email
-        @subject = 'Deadlock Alert in SQL Server',
-        @body = @body;
-END
-GO
+Set-DbatoolsInsecureConnection -SessionOnly
+Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Register
+Set-DbatoolsConfig -FullName sql.connection.encrypt -Value $false -Register
