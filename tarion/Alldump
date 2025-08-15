@@ -12,7 +12,20 @@ Salesforce: MRG9DWRDBD02
 FMS: VMRGFMS92DBD01
 
 
+Use master
+CREATE LOGIN [datalayer_dev@tarion.onmicrosoft.com] FROM EXTERNAL PROVIDER
+GO
 
+EXEC sp_MSForEachDB 
+'Declare @name varchar(100)
+ select @name = ''?''
+ PRINT @name
+ IF db_id(@name) > 4
+ BEGIN
+ USE ?
+ CREATE USER [datalayer_dev@tarion.onmicrosoft.com] FOR LOGIN [datalayer_dev@tarion.onmicrosoft.com];
+EXEC sp_addrolemember ''db_datareader'', ''datalayer_dev@tarion.onmicrosoft.com''
+ END'
 
 
 Friday:  
